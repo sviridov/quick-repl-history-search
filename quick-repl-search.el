@@ -46,12 +46,12 @@
 
 ;;;=================================================================================================
 
-(cl-defmacro quick-repl-search-add-mode (majors-mode history-variable &key (key #'identity)
-                                                                           kill-input-function
-                                                                           mode-map
-                                                                           (mode-map-key (kbd "C-r")))
+(cl-defmacro quick-repl-search-add-mode (major-mode history-variable &key (key #'identity)
+                                                                          kill-input-function
+                                                                          mode-map
+                                                                          (mode-map-key (kbd "C-r")))
  `(progn
-    (setf (gethash ',majors-mode quick-repl-search--modes-table)
+    (setf (gethash ',major-mode quick-repl-search--modes-table)
           (list
            :get-history-function (lambda () (funcall #',key ',history-variable))
            :kill-input-function ,kill-input-function))
