@@ -61,6 +61,11 @@
 
 (make-variable-buffer-local 'quick-repl-search--history-index)
 
+(defvar quick-repl-search--history-length nil
+  "QUICK-REPL-SEARCH--HISTORY length")
+
+(make-variable-buffer-local 'quick-repl-search--history-length)
+
 ;;;=================================================================================================
 
 (cl-defmacro quick-repl-search-add-mode (major-mode history-form &key kill-input-function
@@ -75,6 +80,30 @@
            :send-input-function ,send-input-function))
 
     (define-key ,mode-map ,mode-map-key 'quick-repl-search)))
+
+;;;=================================================================================================
+
+(defmacro quick-repl-search--with-target-buffer (&rest body)
+  "Eval BODY with the QUICK-REPL-SEARCH--TARGET buffer selected"
+  (let ((target (gensym "TARGET")))
+    `(progn
+
+       ;; assert that window and buffer live
+       (cond ((null quick-repl-search--target)
+              (error "quick-repl-search: unexpected error (quick-repl-search--target is nil)"))
+             ((not (window-live-p (car quick-repl-search--target)))
+              (error "quick-repl-search: target window is deleted"))
+             ((not (buffer-live-p (cdr quick-repl-search--target)))
+              (error "quick-repl-search: target buffer is killed")))
+
+       (let ((,target quick-repl-search--target))
+         (with-selected-window (car ,target)
+           ;; if buffer is switched, switch back to the QUICK-REPL-SEARCH--TARGET
+           (unless (eq (current-buffer) (cdr ,target))
+             (switch-to-buffer (cdr ,target))
+             (message "quick-repl-search: buffer is switched"))
+           ;; eval body
+           ,@body)))))
 
 ;;;=================================================================================================
 
@@ -97,12 +126,37 @@
                             (point)))))
     (select-window (split-window-vertically -4))
     (switch-to-buffer (generate-new-buffer "*quick-repl-search*"))
-    (setf quick-repl-search-mode t
-          quick-repl-search--target target
-          quick-repl-search--history (quick-repl-search--get-history)
+    (setf quick-repl-search--target target
+          quick-repl-search-mode t
+          quick-repl-search--history (quick-repl-search--with-target-buffer
+                                       (quick-repl-search--get-history))
+          quick-repl-search--history-length (length quick-repl-search--history)
           mode-line-format quick-repl-search--mode-line-format)
     (when have-input-p
       (yank))))
+
+(defun quick-repl-search--clean ()
+  (let ((window (car quick-repl-search--target)))
+    (setf quick-repl-search--target nil
+          quick-repl-search--history nil
+          quick-repl-search--history-length nil
+          quick-repl-search--history-index nil)
+    (kill-buffer (current-buffer))
+    (delete-window (selected-window))
+    (select-window window)))
+
+;;;=================================================================================================
+
+;;;###autoload
+(defun quick-repl-search ()
+  (interactive)
+  (quick-repl-search--initialize))
+
+;;;=================================================================================================
+
+(defun quick-repl-search-complete ()
+  (interactive)
+  (quick-repl-search--clean))
 
 ;;;=================================================================================================
 
