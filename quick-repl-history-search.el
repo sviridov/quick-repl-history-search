@@ -22,7 +22,8 @@
     (define-key map (kbd "C-s") 'quick-repl-history-search-next)
     (define-key map (kbd "C-r") 'quick-repl-history-search-previous)
     (define-key map (kbd "C-g") 'quick-repl-history-search-abort)
-    (define-key map (kbd "RET") 'quick-repl-history-search-complete)
+    (define-key map (kbd "RET") 'quick-repl-history-search-complete-and-send)
+    (define-key map (kbd "M-RET") 'quick-repl-history-search-complete)
     map)
   "Keymap for the quick-repl-history-search prompt buffers"
   :group 'quick-repl-history-search)
@@ -65,6 +66,10 @@
   "TODO")
 
 (make-variable-buffer-local 'quick-repl-history-search--current-history-item)
+
+(defvar quick-repl-history-search--search-direction-is-next-p nil)
+
+(make-variable-buffer-local 'quick-repl-history-search--search-direction-is-next-p)
 
 (defvar quick-repl-history-search--kill-ring-backup nil
   "Backup of kill ring to restore after QUICK-REPL-HISTORY-SEARCH")
@@ -131,6 +136,8 @@
                             (quick-repl-history-search--kill-input)
                             (point)))))
     (select-window (split-window-vertically -4))
+;    (select-window (minibuffer-window))
+;    (read-from-minibuffer "" "" quick-repl-history-search-mode-map)
     (switch-to-buffer (generate-new-buffer "*quick-repl-history-search*"))
     (setf quick-repl-history-search--target target
           quick-repl-history-search-mode t
@@ -153,27 +160,32 @@
     (kill-buffer (current-buffer))
     (delete-window (selected-window))
     (select-window window)))
+;    (exit-minibuffer)))
 
 ;;;=================================================================================================
 
 (defun quick-repl-history-search--find-next (query)
-  (if (not quick-repl-history-search--history-reversed)
-      (error "No matches")
-    (push quick-repl-history-search--current-history-item quick-repl-history-search--history)
-    (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history-reversed))
-    (if (string-match-p query quick-repl-history-search--current-history-item)
-        quick-repl-history-search--current-history-item
-      (quick-repl-history-search--find-next query))))
+  (setf quick-repl-history-search--search-direction-is-next-p t)
+  (loop
+   (unless quick-repl-history-search--history-reversed
+     (message "No matches")
+     (return))
+   (push quick-repl-history-search--current-history-item quick-repl-history-search--history)
+   (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history-reversed))
+   (when (string-match-p query quick-repl-history-search--current-history-item)
+     (return quick-repl-history-search--current-history-item))))
 
 (defun quick-repl-history-search--find-prev (query)
-  (if (not quick-repl-history-search--history)
-      (error "No matches")
-    (when quick-repl-history-search--current-history-item
-      (push quick-repl-history-search--current-history-item quick-repl-history-search--history-reversed))
-    (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history))
-    (if (string-match-p query quick-repl-history-search--current-history-item)
-        quick-repl-history-search--current-history-item
-      (quick-repl-history-search--find-prev query))))
+  (setf quick-repl-history-search--search-direction-is-next-p nil)
+  (loop
+   (unless quick-repl-history-search--history
+     (message "No matches")
+     (return))
+   (when quick-repl-history-search--current-history-item
+     (push quick-repl-history-search--current-history-item quick-repl-history-search--history-reversed))
+   (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history))
+   (when (string-match-p query quick-repl-history-search--current-history-item)
+     (return quick-repl-history-search--current-history-item))))r
 
 ;;;=================================================================================================
 
@@ -186,17 +198,42 @@
 
 (defun quick-repl-history-search-next ()
   (interactive)
-  (message (quick-repl-history-search--find-next (buffer-string))))
+  (let ((result (quick-repl-history-search--find-next (buffer-string))))
+    (when result
+      (quick-repl-history-search--with-target-buffer
+       (quick-repl-history-search--kill-input)
+       (insert result)))))
 
 (defun quick-repl-history-search-previous ()
   (interactive)
-  (message (quick-repl-history-search--find-prev (buffer-string))))
+  (let ((result (quick-repl-history-search--find-prev (buffer-string))))
+    (when result
+      (quick-repl-history-search--with-target-buffer
+       (quick-repl-history-search--kill-input)
+       (insert result)))))
+
+;;;=================================================================================================
+
+(defun quick-repl-history-search--update (&rest _)
+  (when quick-repl-history-search-mode
+    (unless (and quick-repl-history-search--current-history-item
+                 (string-match-p (buffer-string) quick-repl-history-search--current-history-item))
+      (if quick-repl-history-search--search-direction-is-next-p
+          (quick-repl-history-search-next)
+          (quick-repl-history-search-previous)))))
+
+(add-hook 'after-change-functions 'quick-repl-history-search--update)
 
 ;;;=================================================================================================
 
 (defun quick-repl-history-search-complete ()
   (interactive)
   (quick-repl-history-search--clean))
+
+(defun quick-repl-history-search-complete-and-send ()
+  (interactive)
+  (quick-repl-history-search-complete)
+  (quick-repl-history-search--send-input))
 
 ;;;=================================================================================================
 
