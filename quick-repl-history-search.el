@@ -10,6 +10,7 @@
 ;;;; Change Log:
 ;;;;
 ;;;; 1.0 First released
+;;;; 1.1 Added Eshell support
 
 (require 'cl)
 
@@ -18,7 +19,7 @@
 (defgroup quick-repl-history-search nil
   "Quick history search for any Emacs REPL"
   :group 'emacs
-  :version "1.0"
+  :version "1.1"
   :link '(emacs-library-link :tag "Lisp File" "quick-repl-history-search.el"))
 
 (defcustom quick-repl-history-search-mode-map
@@ -84,6 +85,7 @@
 
 (cl-defmacro quick-repl-history-search-add-repl (major-mode history-form &key kill-input-function
                                                                               send-input-function
+                                                                              mode-hook
                                                                               mode-map
                                                                               (mode-map-key (kbd "C-r")))
  `(progn
@@ -93,7 +95,9 @@
            :kill-input-function ,kill-input-function
            :send-input-function ,send-input-function))
 
-    (define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))
+   ,(if mode-hook
+       `(add-hook ',mode-hook (lambda () (define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))
+       `(define-key ,mode-map ,mode-map-key 'quick-repl-history-search))))
 
 ;;;=================================================================================================
 
@@ -256,6 +260,25 @@
                                       :kill-input-function #'slime-repl-kill-input
                                       :send-input-function #'slime-repl-return
                                       :mode-map slime-repl-mode-map))
+
+;;;=================================================================================================
+
+(defun quick-repl-history-search--get-eshell-history ()
+  (destructuring-bind (end-position size . history)
+      eshell-history-ring
+    (setf history (coerce history 'list))
+    (nreverse
+     (nconc
+      (nthcdr end-position history)
+      (subseq history 0 end-position)))))
+
+(eval-after-load "eshell"
+ `(quick-repl-history-search-add-repl eshell-mode
+                                      (quick-repl-history-search--get-eshell-history)
+                                      :kill-input-function #'eshell-kill-input
+                                      :send-input-function #'eshell-send-input
+                                      :mode-map eshell-mode-map
+                                      :mode-hook eshell-mode-hook))
 
 ;;;=================================================================================================
 
