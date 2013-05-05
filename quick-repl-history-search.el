@@ -237,6 +237,16 @@
 
 ;;;=================================================================================================
 
+(defun quick-repl-history-search-abort ()
+  (interactive)
+  (let ((query (buffer-string)))
+    (quick-repl-history-search--with-target-buffer
+     (quick-repl-history-search--kill-input)
+     (insert query))
+    (quick-repl-history-search-complete)))
+
+;;;=================================================================================================
+
 (eval-after-load "slime"
  `(quick-repl-history-search-add-repl slime-repl-mode slime-repl-input-history
                                       :kill-input-function #'slime-repl-kill-input
