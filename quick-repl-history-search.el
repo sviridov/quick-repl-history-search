@@ -185,7 +185,7 @@
      (push quick-repl-history-search--current-history-item quick-repl-history-search--history-reversed))
    (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history))
    (when (string-match-p query quick-repl-history-search--current-history-item)
-     (return quick-repl-history-search--current-history-item))))r
+     (return quick-repl-history-search--current-history-item))))
 
 ;;;=================================================================================================
 
