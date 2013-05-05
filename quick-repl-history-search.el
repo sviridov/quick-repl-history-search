@@ -6,6 +6,10 @@
 ;;;; For a detailed introduction see: README.md
 ;;;;
 ;;;; Copyright (C) 2013 Sviridov Alexander <sviridov.vmi@gmail.com>
+;;;;
+;;;; Change Log:
+;;;;
+;;;; 1.0 First released
 
 (require 'cl)
 
