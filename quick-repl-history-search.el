@@ -278,7 +278,7 @@
        (if (< number-of-elements length-minus-end-postion)
            (subseq history end-position (+ end-position number-of-elements))
            (nconc
-            (subseq history end-position length-minus-end-postion)
+            (subseq history end-position (+ end-position length-minus-end-postion))
             (subseq history 0 (- number-of-elements length-minus-end-postion))))))))
 
 (eval-after-load "eshell"
