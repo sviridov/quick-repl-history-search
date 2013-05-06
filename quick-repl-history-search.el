@@ -268,7 +268,7 @@
 
 ;;;=================================================================================================
 
-(defun quick-repl-history-search--get-history-from-kill-ring (ring)
+(defun quick-repl-history-search--get-history-from-ring (ring)
   (destructuring-bind (end-position number-of-elements . history)
       ring
     (setf history (coerce history 'list))
@@ -283,7 +283,7 @@
 
 (eval-after-load "eshell"
  `(quick-repl-history-search-add-repl eshell-mode
-                                      (quick-repl-history-search--get-history-from-kill-ring eshell-history-ring)
+                                      (quick-repl-history-search--get-history-from-ring eshell-history-ring)
                                       :kill-input-function #'eshell-kill-input
                                       :send-input-function #'eshell-send-input
                                       :mode-map eshell-mode-map
@@ -291,7 +291,7 @@
 
 (eval-after-load "ielm"
  `(quick-repl-history-search-add-repl inferior-emacs-lisp-mode
-                                      (quick-repl-history-search--get-history-from-kill-ring comint-input-ring)
+                                      (quick-repl-history-search--get-history-from-ring comint-input-ring)
                                       :kill-input-function #'comint-kill-input
                                       :send-input-function #'ielm-send-input
                                       :mode-map ielm-map
