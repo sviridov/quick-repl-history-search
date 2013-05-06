@@ -9,8 +9,10 @@
 ;;;;
 ;;;; Change Log:
 ;;;;
-;;;; 1.0 First released
+;;;; 1.0 First released.
+;;;;     Added SLiME support
 ;;;; 1.1 Added Eshell support
+;;;; 1.2 Added IELM support
 
 (require 'cl)
 
@@ -19,7 +21,7 @@
 (defgroup quick-repl-history-search nil
   "Quick history search for any Emacs REPL"
   :group 'emacs
-  :version "1.1"
+  :version "1.2"
   :link '(emacs-library-link :tag "Lisp File" "quick-repl-history-search.el"))
 
 (defcustom quick-repl-history-search-mode-map
@@ -263,22 +265,30 @@
 
 ;;;=================================================================================================
 
-(defun quick-repl-history-search--get-eshell-history ()
+(defun quick-repl-history-search--get-history-from-kill-ring (ring)
   (destructuring-bind (end-position size . history)
-      eshell-history-ring
+      ring
     (setf history (coerce history 'list))
     (nreverse
      (nconc
-      (nthcdr end-position history)
+      (subseq history end-position size)
       (subseq history 0 end-position)))))
 
 (eval-after-load "eshell"
  `(quick-repl-history-search-add-repl eshell-mode
-                                      (quick-repl-history-search--get-eshell-history)
+                                      (quick-repl-history-search--get-history-from-kill-ring eshell-history-ring)
                                       :kill-input-function #'eshell-kill-input
                                       :send-input-function #'eshell-send-input
                                       :mode-map eshell-mode-map
                                       :mode-hook eshell-mode-hook))
+
+(eval-after-load "ielm"
+ `(quick-repl-history-search-add-repl inferior-emacs-lisp-mode
+                                      (quick-repl-history-search--get-history-from-kill-ring comint-input-ring)
+                                      :kill-input-function #'comint-kill-input
+                                      :send-input-function #'ielm-send-input
+                                      :mode-map ielm-map
+                                      :mode-hook ielm-mode-hook))
 
 ;;;=================================================================================================
 
