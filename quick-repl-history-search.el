@@ -269,13 +269,17 @@
 ;;;=================================================================================================
 
 (defun quick-repl-history-search--get-history-from-kill-ring (ring)
-  (destructuring-bind (end-position size . history)
+  (destructuring-bind (end-position number-of-elements . history)
       ring
     (setf history (coerce history 'list))
-    (nreverse
-     (nconc
-      (subseq history end-position size)
-      (subseq history 0 end-position)))))
+    (let* ((length (length history))
+           (length-minus-end-postion (- length end-position)))
+      (nreverse
+       (if (< number-of-elements length-minus-end-postion)
+           (subseq history end-position (+ end-position number-of-elements))
+           (nconc
+            (subseq history end-position length-minus-end-postion)
+            (subseq history 0 (- number-of-elements length-minus-end-postion))))))))
 
 (eval-after-load "eshell"
  `(quick-repl-history-search-add-repl eshell-mode
