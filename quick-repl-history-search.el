@@ -85,21 +85,24 @@
 
 ;;;=================================================================================================
 
-(cl-defmacro quick-repl-history-search-add-repl (major-mode history-form &key kill-input-function
-                                                                              send-input-function
-                                                                              mode-hook
-                                                                              mode-map
-                                                                              (mode-map-key (kbd "C-r")))
- `(progn
-    (setf (gethash ',major-mode quick-repl-history-search--repls-table)
-          (list
-           :get-history-function (lambda () ,history-form)
-           :kill-input-function ,kill-input-function
-           :send-input-function ,send-input-function))
+(defmacro quick-repl-history-search-add-repl (major-mode history-form &rest args)
+  (destructuring-bind (&key kill-input-function
+                            send-input-function
+                            mode-hook
+                            mode-map
+                            (mode-map-key (kbd "C-r")))
+      args
 
-   ,(if mode-hook
-       `(add-hook ',mode-hook (lambda () (define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))
-       `(define-key ,mode-map ,mode-map-key 'quick-repl-history-search))))
+    `(progn
+       (setf (gethash ',major-mode quick-repl-history-search--repls-table)
+             (list
+              :get-history-function (lambda () ,history-form)
+              :kill-input-function ,kill-input-function
+              :send-input-function ,send-input-function))
+
+      ,(if mode-hook
+          `(add-hook ',mode-hook (lambda () (define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))
+          `(define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))))
 
 ;;;=================================================================================================
 
