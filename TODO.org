@@ -1,6 +1,0 @@
-
-* TODO Change prompt buffer to minibuffer
-
-* TODO Change history search algorithm
-
-* TODO Add more REPLs
