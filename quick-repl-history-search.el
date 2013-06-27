@@ -125,7 +125,7 @@
            (unless (eq (current-buffer) (cdr ,target))
              (switch-to-buffer (cdr ,target))
              (message "quick-repl-history-search: buffer is switched"))
-           ;; eval body
+
            ,@body)))))
 
 ;;;=================================================================================================
@@ -149,8 +149,6 @@
                             (quick-repl-history-search--kill-input)
                             (point)))))
     (select-window (split-window-vertically -4))
-;    (select-window (minibuffer-window))
-;    (read-from-minibuffer "" "" quick-repl-history-search-mode-map)
     (switch-to-buffer (generate-new-buffer "*quick-repl-history-search*"))
     (setf quick-repl-history-search--target target
           quick-repl-history-search-mode t
@@ -173,7 +171,6 @@
     (kill-buffer (current-buffer))
     (delete-window (selected-window))
     (select-window window)))
-;    (exit-minibuffer)))
 
 ;;;=================================================================================================
 
