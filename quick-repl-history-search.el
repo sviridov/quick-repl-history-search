@@ -30,7 +30,7 @@
     (define-key map (kbd "C-r") 'quick-repl-history-search-previous)
     (define-key map (kbd "C-g") 'quick-repl-history-search-abort)
     (define-key map (kbd "RET") 'quick-repl-history-search-complete-and-send)
-    (define-key map (kbd "M-RET") 'quick-repl-history-search-complete)
+    (define-key map (kbd "C-<return>") 'quick-repl-history-search-complete)
     map)
   "Keymap for the quick-repl-history-search prompt buffers"
   :group 'quick-repl-history-search)
