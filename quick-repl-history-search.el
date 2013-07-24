@@ -13,6 +13,7 @@
 ;;;;     Added SLiME support
 ;;;; 1.1 Added Eshell support
 ;;;; 1.2 Added IELM support
+;;;; 1.3 Added Skewer support
 
 (require 'cl)
 
@@ -21,7 +22,7 @@
 (defgroup quick-repl-history-search nil
   "Quick history search for any Emacs REPL"
   :group 'emacs
-  :version "1.2"
+  :version "1.3"
   :link '(emacs-library-link :tag "Lisp File" "quick-repl-history-search.el"))
 
 (defcustom quick-repl-history-search-mode-map
@@ -257,7 +258,7 @@
 
 ;;;=================================================================================================
 
-(eval-after-load "slime"
+(eval-after-load "slime-repl"
  `(quick-repl-history-search-add-repl slime-repl-mode slime-repl-input-history
                                       :kill-input-function #'slime-repl-kill-input
                                       :send-input-function #'slime-repl-return
@@ -293,6 +294,14 @@
                                       :send-input-function #'ielm-send-input
                                       :mode-map ielm-map
                                       :mode-hook ielm-mode-hook))
+
+(eval-after-load "skewer-repl"
+ `(quick-repl-history-search-add-repl skewer-repl-mode
+                                      (quick-repl-history-search--get-history-from-ring comint-input-ring)
+                                      :kill-input-function #'comint-kill-input
+                                      :send-input-function #'comint-send-input
+                                      :mode-map skewer-repl-mode-map
+                                      :mode-hook skewer-repl-mode-hook))
 
 ;;;=================================================================================================
 
