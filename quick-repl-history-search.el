@@ -87,10 +87,11 @@
 ;;;=================================================================================================
 
 (defmacro quick-repl-history-search-add-repl (major-mode history-form &rest args)
-  (destructuring-bind (&key kill-input-function
-                            send-input-function
-                            mode-hook
-                            mode-map
+  (destructuring-bind (&key (prefix (substring (symbol-name major-mode) 0 (- (length (symbol-name major-mode)) 5)))
+                            (kill-input-function (intern (concat prefix "-kill-input")))
+                            (send-input-function (intern (concat prefix "-send-input")))
+                            (mode-hook (intern (concat prefix "-mode-hook")))
+                            (mode-map  (intern (concat prefix "-mode-map" )))
                             (mode-map-key (kbd "C-r")))
       args
 
@@ -98,12 +99,32 @@
        (setf (gethash ',major-mode quick-repl-history-search--repls-table)
              (list
               :get-history-function (lambda () ,history-form)
-              :kill-input-function ,kill-input-function
-              :send-input-function ,send-input-function))
+              :kill-input-function #',kill-input-function
+              :send-input-function #',send-input-function))
 
       ,(if mode-hook
           `(add-hook ',mode-hook (lambda () (define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))
           `(define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))))
+
+;;;=================================================================================================
+
+(defmacro quick-repl-history-search-add-comint-repl (major-mode &rest args)
+  (destructuring-bind (&key (prefix (substring (symbol-name major-mode) 0 (- (length (symbol-name major-mode)) 5)))
+                            (kill-input-function 'comint-kill-input)
+                            (send-input-function 'comint-send-input)
+                            (history-form '(quick-repl-history-search--get-history-from-ring comint-input-ring))
+                            (mode-hook (intern (concat prefix "-mode-hook")))
+                            (mode-map  (intern (concat prefix "-mode-map" )))
+                            (mode-map-key (kbd "C-r")))
+      args
+
+   `(quick-repl-history-search-add-repl ,major-mode ,history-form
+                                        :prefix ,prefix
+                                        :kill-input-function ,kill-input-function
+                                        :send-input-function ,send-input-function
+                                        :mode-hook ,mode-hook
+                                        :mode-map  ,mode-map
+                                        :mode-map-key ,mode-map-key)))
 
 ;;;=================================================================================================
 
@@ -259,10 +280,8 @@
 ;;;=================================================================================================
 
 (eval-after-load "slime-repl"
- `(quick-repl-history-search-add-repl slime-repl-mode slime-repl-input-history
-                                      :kill-input-function #'slime-repl-kill-input
-                                      :send-input-function #'slime-repl-return
-                                      :mode-map slime-repl-mode-map))
+ `(quick-repl-history-search-add-repl slime-repl-mode
+    slime-repl-input-history :send-input-function slime-repl-return))
 
 ;;;=================================================================================================
 
@@ -281,27 +300,16 @@
 
 (eval-after-load "eshell"
  `(quick-repl-history-search-add-repl eshell-mode
-                                      (quick-repl-history-search--get-history-from-ring eshell-history-ring)
-                                      :kill-input-function #'eshell-kill-input
-                                      :send-input-function #'eshell-send-input
-                                      :mode-map eshell-mode-map
-                                      :mode-hook eshell-mode-hook))
+    (quick-repl-history-search--get-history-from-ring eshell-history-ring)))
 
 (eval-after-load "ielm"
- `(quick-repl-history-search-add-repl inferior-emacs-lisp-mode
-                                      (quick-repl-history-search--get-history-from-ring comint-input-ring)
-                                      :kill-input-function #'comint-kill-input
-                                      :send-input-function #'ielm-send-input
-                                      :mode-map ielm-map
-                                      :mode-hook ielm-mode-hook))
+ `(quick-repl-history-search-add-comint-repl inferior-emacs-lisp-mode
+    :prefix "ielm"
+    :send-input-function ielm-send-input
+    :mode-map ielm-map))
 
 (eval-after-load "skewer-repl"
- `(quick-repl-history-search-add-repl skewer-repl-mode
-                                      (quick-repl-history-search--get-history-from-ring comint-input-ring)
-                                      :kill-input-function #'comint-kill-input
-                                      :send-input-function #'comint-send-input
-                                      :mode-map skewer-repl-mode-map
-                                      :mode-hook skewer-repl-mode-hook))
+ `(quick-repl-history-search-add-comint-repl skewer-repl-mode))
 
 ;;;=================================================================================================
 
