@@ -88,6 +88,8 @@
 (defvar quick-repl-history-search--after-change-update-p t
   "TODO")
 
+(make-variable-buffer-local 'quick-repl-history-search--after-change-update-p)
+
 ;;;=================================================================================================
 
 (defmacro quick-repl-history-search-add-repl (major-mode history-form &rest args)
