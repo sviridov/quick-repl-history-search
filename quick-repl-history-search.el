@@ -32,6 +32,7 @@
     (define-key map (kbd "C-g") 'quick-repl-history-search-abort)
     (define-key map (kbd "RET") 'quick-repl-history-search-complete-and-send)
     (define-key map (kbd "C-<return>") 'quick-repl-history-search-complete)
+    (define-key map (kbd "C-SPC") 'quick-repl-history-search-start/stop-after-change-update)
     map)
   "Keymap for the quick-repl-history-search prompt buffers"
   :group 'quick-repl-history-search)
@@ -83,6 +84,9 @@
   "Backup of kill ring to restore after QUICK-REPL-HISTORY-SEARCH")
 
 (make-variable-buffer-local 'quick-repl-history-search--kill-ring-backup)
+
+(defvar quick-repl-history-search--after-change-update-p t
+  "TODO")
 
 ;;;=================================================================================================
 
@@ -200,8 +204,7 @@
   (setf quick-repl-history-search--search-direction-is-next-p t)
   (loop
    (unless quick-repl-history-search--history-reversed
-     (message "No matches")
-     (return))
+     (error "No matches"))
    (push quick-repl-history-search--current-history-item quick-repl-history-search--history)
    (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history-reversed))
    (when (string-match-p query quick-repl-history-search--current-history-item)
@@ -211,8 +214,7 @@
   (setf quick-repl-history-search--search-direction-is-next-p nil)
   (loop
    (unless quick-repl-history-search--history
-     (message "No matches")
-     (return))
+     (error "No matches"))
    (when quick-repl-history-search--current-history-item
      (push quick-repl-history-search--current-history-item quick-repl-history-search--history-reversed))
    (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history))
@@ -247,7 +249,8 @@
 ;;;=================================================================================================
 
 (defun quick-repl-history-search--update (&rest _)
-  (when quick-repl-history-search-mode
+  (when (and quick-repl-history-search-mode
+             quick-repl-history-search--after-change-update-p)
     (unless (and quick-repl-history-search--current-history-item
                  (string-match-p (buffer-string) quick-repl-history-search--current-history-item))
       (if quick-repl-history-search--search-direction-is-next-p
@@ -255,6 +258,15 @@
           (quick-repl-history-search-previous)))))
 
 (add-hook 'after-change-functions 'quick-repl-history-search--update)
+
+;;;=================================================================================================
+
+(defun quick-repl-history-search-start/stop-after-change-update ()
+  (interactive)
+  (if quick-repl-history-search--after-change-update-p
+      (message "Stoping after change update")
+      (message "Starting after change update"))
+  (setq quick-repl-history-search--after-change-update-p (not quick-repl-history-search--after-change-update-p)))
 
 ;;;=================================================================================================
 

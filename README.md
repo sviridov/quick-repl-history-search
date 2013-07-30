@@ -16,6 +16,7 @@
 * Press `C-r` or `C-s` to move between history items
 * Press `RET` to send selected input
 * Press `C-RET` to insert selected input without sending
+* Press `C-SPC` to start/stop after change update
 * Press `G-g` to abort
 
 ## Supported REPLs
