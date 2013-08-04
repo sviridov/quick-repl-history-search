@@ -21,7 +21,8 @@
 
 ## Supported REPLs
 
-* SLiME
 * Eshell
 * IELM
+* nREPL
 * Skewer
+* SLiME

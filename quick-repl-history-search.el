@@ -14,6 +14,7 @@
 ;;;; 1.1 Added Eshell support
 ;;;; 1.2 Added IELM support
 ;;;; 1.3 Added Skewer support
+;;;; 1.4 Added nREPL support
 
 (require 'cl)
 
@@ -296,6 +297,10 @@
 (eval-after-load "slime-repl"
  `(quick-repl-history-search-add-repl slime-repl-mode
     slime-repl-input-history :send-input-function slime-repl-return))
+
+(eval-after-load "nrepl"
+ `(quick-repl-history-search-add-repl nrepl-mode
+    nrepl-input-history))
 
 ;;;=================================================================================================
 
