@@ -23,7 +23,7 @@
 (defgroup quick-repl-history-search nil
   "Quick history search for any Emacs REPL"
   :group 'emacs
-  :version "1.3"
+  :version "1.4"
   :link '(emacs-library-link :tag "Lisp File" "quick-repl-history-search.el"))
 
 (defcustom quick-repl-history-search-mode-map
