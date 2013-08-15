@@ -38,13 +38,15 @@
   "Keymap for the quick-repl-history-search prompt buffers"
   :group 'quick-repl-history-search)
 
-(defvar quick-repl-history-search--repls-table (make-hash-table)
-  "Variable in which stored different information about REPLs.
-   Information represented as a plist.
-   Plist keys:
-    `:get-history-function'
-    `:kill-input-function'
-    `:send-input-function'")
+(defcustom quick-repl-history-search-simple-search-key (kbd "C-r")
+  "Default key for REPL mode-map to start `quick-repl-history-search'"
+  :group 'quick-repl-history-search)
+
+(defcustom quick-repl-history-search-regexp-search-key (kbd "C-M-r")
+  "Default key for REPL mode-map to start `quick-repl-history-regexp-search'"
+  :group 'quick-repl-history-search)
+
+;;;=================================================================================================
 
 (defvar quick-repl-history-search-mode nil
   "Minor mode for quick-repl-history-search prompt buffer")
@@ -57,83 +59,31 @@
 (defvar quick-repl-history-search--mode-line-format
   '(" *quick-repl-history-search*")) ;; TODO: Add more information
 
+;;;=================================================================================================
+
+(defvar quick-repl-history-search--repls-table (make-hash-table)
+  "Contains different information about REPLs.
+   Information represented as a plist.
+   Plist keys:
+    `:get-history-function'
+    `:kill-input-function'
+    `:send-input-function'")
+
+(defmacro quick-repl-history-search--defgetter (name getter)
+  "Provides defining of `quick-repl-history-search--repls-table' access functions"
+ `(defun ,name ()
+    (funcall (getf (gethash major-mode quick-repl-history-search--repls-table) ,getter))))
+
+(quick-repl-history-search--defgetter quick-repl-history-search--get-history :get-history-function)
+(quick-repl-history-search--defgetter quick-repl-history-search--kill-input  :kill-input-function)
+(quick-repl-history-search--defgetter quick-repl-history-search--send-input  :send-input-function)
+
+;;;=================================================================================================
+
 (defvar quick-repl-history-search--target nil
   "The target (window . buffer) which this prompt buffer is for")
 
 (make-variable-buffer-local 'quick-repl-history-search--target)
-
-(defvar quick-repl-history-search--history nil
-  "TODO")
-
-(make-variable-buffer-local 'quick-repl-history-search--history)
-
-(defvar quick-repl-history-search--history-reversed nil
-  "TODO")
-
-(make-variable-buffer-local 'quick-repl-history-search--history-reversed)
-
-(defvar quick-repl-history-search--current-history-item nil
-  "TODO")
-
-(make-variable-buffer-local 'quick-repl-history-search--current-history-item)
-
-(defvar quick-repl-history-search--search-direction-is-next-p nil)
-
-(make-variable-buffer-local 'quick-repl-history-search--search-direction-is-next-p)
-
-(defvar quick-repl-history-search--kill-ring-backup nil
-  "Backup of kill ring to restore after QUICK-REPL-HISTORY-SEARCH")
-
-(make-variable-buffer-local 'quick-repl-history-search--kill-ring-backup)
-
-(defvar quick-repl-history-search--after-change-update-p t
-  "TODO")
-
-(make-variable-buffer-local 'quick-repl-history-search--after-change-update-p)
-
-;;;=================================================================================================
-
-(defmacro quick-repl-history-search-add-repl (major-mode history-form &rest args)
-  (destructuring-bind (&key (prefix (substring (symbol-name major-mode) 0 (- (length (symbol-name major-mode)) 5)))
-                            (kill-input-function (intern (concat prefix "-kill-input")))
-                            (send-input-function (intern (concat prefix "-send-input")))
-                            (mode-hook (intern (concat prefix "-mode-hook")))
-                            (mode-map  (intern (concat prefix "-mode-map" )))
-                            (mode-map-key (kbd "C-r")))
-      args
-
-    `(progn
-       (setf (gethash ',major-mode quick-repl-history-search--repls-table)
-             (list
-              :get-history-function (lambda () ,history-form)
-              :kill-input-function #',kill-input-function
-              :send-input-function #',send-input-function))
-
-      ,(if mode-hook
-          `(add-hook ',mode-hook (lambda () (define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))
-          `(define-key ,mode-map ,mode-map-key 'quick-repl-history-search)))))
-
-;;;=================================================================================================
-
-(defmacro quick-repl-history-search-add-comint-repl (major-mode &rest args)
-  (destructuring-bind (&key (prefix (substring (symbol-name major-mode) 0 (- (length (symbol-name major-mode)) 5)))
-                            (kill-input-function 'comint-kill-input)
-                            (send-input-function 'comint-send-input)
-                            (history-form '(quick-repl-history-search--get-history-from-ring comint-input-ring))
-                            (mode-hook (intern (concat prefix "-mode-hook")))
-                            (mode-map  (intern (concat prefix "-mode-map" )))
-                            (mode-map-key (kbd "C-r")))
-      args
-
-   `(quick-repl-history-search-add-repl ,major-mode ,history-form
-                                        :prefix ,prefix
-                                        :kill-input-function ,kill-input-function
-                                        :send-input-function ,send-input-function
-                                        :mode-hook ,mode-hook
-                                        :mode-map  ,mode-map
-                                        :mode-map-key ,mode-map-key)))
-
-;;;=================================================================================================
 
 (defmacro quick-repl-history-search--with-target-buffer (&rest body)
   "Eval BODY with the QUICK-REPL-HISTORY-SEARCH--TARGET buffer selected"
@@ -159,26 +109,83 @@
 
 ;;;=================================================================================================
 
-(defmacro quick-repl-history-search--defgetter (name getter)
- `(defun ,name ()
-    (funcall (getf (gethash major-mode quick-repl-history-search--repls-table) ,getter))))
+(defvar quick-repl-history-search--regexp-search-p nil
+  "Variable which affects the matching algorithm of `quick-repl-history-search--find-next'
+   and `quick-repl-history-search--find-prev'")
 
-(quick-repl-history-search--defgetter quick-repl-history-search--get-history :get-history-function)
-(quick-repl-history-search--defgetter quick-repl-history-search--kill-input  :kill-input-function)
-(quick-repl-history-search--defgetter quick-repl-history-search--send-input  :send-input-function)
+(make-variable-buffer-local 'quick-repl-history-search--regexp-search-p)
+
+(defvar quick-repl-history-search--history nil
+  "Current REPL history (represented as a list) from newest to oldest.
+   At start is whole REPL history.
+   After calling `quick-repl-history-search--find-next' or `quick-repl-history-search--find-prev'
+   is REPL history before (older) `quick-repl-history-search--current-history-item'")
+
+(make-variable-buffer-local 'quick-repl-history-search--history)
+
+(defvar quick-repl-history-search--history-reversed nil
+  "Current REPL history (represented as a list) from oldest to newest.
+   At start is NIL.
+   After calling `quick-repl-history-search--find-next' or `quick-repl-history-search--find-prev'
+   is REPL history after (newer) `quick-repl-history-search--current-history-item'")
+
+(make-variable-buffer-local 'quick-repl-history-search--history-reversed)
+
+(defvar quick-repl-history-search--current-history-item nil
+  "Current element of REPL history.
+   At start is NIL")
+
+(make-variable-buffer-local 'quick-repl-history-search--current-history-item)
+
+(defvar quick-repl-history-search--search-direction-is-next-p nil
+  "Last search direction. Used in `quick-repl-history-search--update'")
+
+(make-variable-buffer-local 'quick-repl-history-search--search-direction-is-next-p)
+
+(defmacro quick-repl-history-search--define-find-function (name direction-is-next-p)
+  "Provides defining of history finding funtions"
+  (let ((push-list (if direction-is-next-p 'quick-repl-history-search--history 'quick-repl-history-search--history-reversed))
+        (pop-list  (if direction-is-next-p 'quick-repl-history-search--history-reversed 'quick-repl-history-search--history)))
+   `(defun ,name (query)
+      (setf quick-repl-history-search--search-direction-is-next-p ,direction-is-next-p)
+      (unless quick-repl-history-search--regexp-search-p
+        (setf query (regexp-quote query)))
+      (loop
+       (unless ,pop-list
+         (message "No matches")
+         (return))
+       (when quick-repl-history-search--current-history-item
+        (push quick-repl-history-search--current-history-item ,push-list))
+       (setf quick-repl-history-search--current-history-item (pop ,pop-list))
+       (when (string-match-p query quick-repl-history-search--current-history-item)
+         (return quick-repl-history-search--current-history-item))))))
+
+(quick-repl-history-search--define-find-function quick-repl-history-search--find-next t)
+(quick-repl-history-search--define-find-function quick-repl-history-search--find-prev nil)
 
 ;;;=================================================================================================
 
-(defun quick-repl-history-search--initialize ()
+(defvar quick-repl-history-search--kill-ring-backup nil
+  "Backup of kill ring to restore after QUICK-REPL-HISTORY-SEARCH")
+
+(make-variable-buffer-local 'quick-repl-history-search--kill-ring-backup)
+
+(defun quick-repl-history-search--initialize (&optional regexp-search-p)
+  "Initializes quick-repl-history-search buffer and  buffer-local variables"
   (end-of-buffer)
-  (let ((kill-ring-copy (copy-list kill-ring))
+  (let ((kill-ring-copy (copy-list kill-ring)) ;; FIXME
         (target (cons (selected-window) (current-buffer)))
-        (have-input-p (/= (point)
-                          (progn
-                            (quick-repl-history-search--kill-input)
-                            (point)))))
+        ;; if REPL has input, kill it
+        (has-input-p (/= (point)
+                         (progn
+                           (quick-repl-history-search--kill-input)
+                           (point)))))
+
+    ;; quick-repl-history-search buffer initialization
     (select-window (split-window-vertically -4))
     (switch-to-buffer (generate-new-buffer "*quick-repl-history-search*"))
+
+    ;; quick-repl-history-search buffer-local variables initialization
     (setf quick-repl-history-search--target target
           quick-repl-history-search-mode t
           quick-repl-history-search--history (quick-repl-history-search--with-target-buffer
@@ -186,43 +193,20 @@
           quick-repl-history-search--history-reversed nil
           quick-repl-history-search--current-history-item nil
           quick-repl-history-search--kill-ring-backup kill-ring-copy
+          quick-repl-history-search--regexp-search-p regexp-search-p
           mode-line-format quick-repl-history-search--mode-line-format)
-    (when have-input-p
+
+    ;; if REPL has input, yank it into quick-repl-history-search buffer
+    (when has-input-p
       (yank))))
 
 (defun quick-repl-history-search--clean ()
+  "Finalize quick-repl-history-search buffer"
+  (setf kill-ring quick-repl-history-search--kill-ring-backup) ;; FIXME
   (let ((window (car quick-repl-history-search--target)))
-    (setf quick-repl-history-search--target nil
-          quick-repl-history-search--history nil
-          quick-repl-history-search--history-reversed nil
-          quick-repl-history-search--current-history-item nil
-          kill-ring quick-repl-history-search--kill-ring-backup)
     (kill-buffer (current-buffer))
     (delete-window (selected-window))
     (select-window window)))
-
-;;;=================================================================================================
-
-(defun quick-repl-history-search--find-next (query)
-  (setf quick-repl-history-search--search-direction-is-next-p t)
-  (loop
-   (unless quick-repl-history-search--history-reversed
-     (error "No matches"))
-   (push quick-repl-history-search--current-history-item quick-repl-history-search--history)
-   (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history-reversed))
-   (when (string-match-p query quick-repl-history-search--current-history-item)
-     (return quick-repl-history-search--current-history-item))))
-
-(defun quick-repl-history-search--find-prev (query)
-  (setf quick-repl-history-search--search-direction-is-next-p nil)
-  (loop
-   (unless quick-repl-history-search--history
-     (error "No matches"))
-   (when quick-repl-history-search--current-history-item
-     (push quick-repl-history-search--current-history-item quick-repl-history-search--history-reversed))
-   (setf quick-repl-history-search--current-history-item (pop quick-repl-history-search--history))
-   (when (string-match-p query quick-repl-history-search--current-history-item)
-     (return quick-repl-history-search--current-history-item))))
 
 ;;;=================================================================================================
 
@@ -231,7 +215,10 @@
   (interactive)
   (quick-repl-history-search--initialize))
 
-;;;=================================================================================================
+;;;###autoload
+(defun quick-repl-history-regexp-search ()
+  (interactive)
+  (quick-repl-history-search--initialize t))
 
 (defun quick-repl-history-search-next ()
   (interactive)
@@ -249,7 +236,29 @@
        (quick-repl-history-search--kill-input)
        (insert result)))))
 
+(defun quick-repl-history-search-complete ()
+  (interactive)
+  (quick-repl-history-search--clean))
+
+(defun quick-repl-history-search-complete-and-send ()
+  (interactive)
+  (quick-repl-history-search-complete)
+  (quick-repl-history-search--send-input))
+
+(defun quick-repl-history-search-abort ()
+  (interactive)
+  (let ((query (buffer-string)))
+    (quick-repl-history-search--with-target-buffer
+     (quick-repl-history-search--kill-input)
+     (insert query))
+    (quick-repl-history-search-complete)))
+
 ;;;=================================================================================================
+
+(defvar quick-repl-history-search--after-change-update-p t
+  "Variable that affects the automatic after-change update of target buffer")
+
+(make-variable-buffer-local 'quick-repl-history-search--after-change-update-p)
 
 (defun quick-repl-history-search--update (&rest _)
   (when (and quick-repl-history-search-mode
@@ -273,37 +282,6 @@
 
 ;;;=================================================================================================
 
-(defun quick-repl-history-search-complete ()
-  (interactive)
-  (quick-repl-history-search--clean))
-
-(defun quick-repl-history-search-complete-and-send ()
-  (interactive)
-  (quick-repl-history-search-complete)
-  (quick-repl-history-search--send-input))
-
-;;;=================================================================================================
-
-(defun quick-repl-history-search-abort ()
-  (interactive)
-  (let ((query (buffer-string)))
-    (quick-repl-history-search--with-target-buffer
-     (quick-repl-history-search--kill-input)
-     (insert query))
-    (quick-repl-history-search-complete)))
-
-;;;=================================================================================================
-
-(eval-after-load "slime-repl"
- `(quick-repl-history-search-add-repl slime-repl-mode
-    slime-repl-input-history :send-input-function slime-repl-return))
-
-(eval-after-load "nrepl"
- `(quick-repl-history-search-add-repl nrepl-mode
-    nrepl-input-history))
-
-;;;=================================================================================================
-
 (defun quick-repl-history-search--get-history-from-ring (ring)
   (destructuring-bind (end-position number-of-elements . history)
       ring
@@ -317,6 +295,51 @@
             (subseq history end-position (+ end-position length-minus-end-postion))
             (subseq history 0 (- number-of-elements length-minus-end-postion))))))))
 
+;;;=================================================================================================
+
+(cl-defmacro quick-repl-history-search-add-repl (major-mode history-form
+                                                      &key (prefix (substring (symbol-name major-mode) 0
+                                                                              (- (length (symbol-name major-mode)) 5)))
+                                                           (kill-input-function (intern (concat prefix "-kill-input")))
+                                                           (send-input-function (intern (concat prefix "-send-input")))
+                                                           (mode-hook (intern (concat prefix "-mode-hook")))
+                                                           (mode-map  (intern (concat prefix "-mode-map" )))
+                                                           (simple-search-key quick-repl-history-search-simple-search-key)
+                                                           (regexp-search-key quick-repl-history-search-regexp-search-key))
+  `(progn
+     (setf (gethash ',major-mode quick-repl-history-search--repls-table)
+           (list
+            :get-history-function (lambda () ,history-form)
+            :kill-input-function #',kill-input-function
+            :send-input-function #',send-input-function))
+
+     ,(if mode-hook
+          `(add-hook ',mode-hook
+             (lambda ()
+               (define-key ,mode-map ,simple-search-key 'quick-repl-history-search)
+               (define-key ,mode-map ,regexp-search-key 'quick-repl-history-regexp-search)))
+        `(define-key ,mode-map ,simple-search-key 'quick-repl-history-search)
+        `(define-key ,mode-map ,regexp-search-key 'quick-repl-history-regexp-search))))
+
+;;;=================================================================================================
+
+(cl-defmacro quick-repl-history-search-add-comint-repl (major-mode &rest args &key prefix
+                                                                                   kill-input-function
+                                                                                   send-input-function
+                                                                                   mode-hook
+                                                                                   mode-map
+                                                                                   simple-search-key
+                                                                                   regexp-search-key)
+
+  (setf (getf args :kill-input-function) (getf args :kill-input-function #'comint-kill-input)
+        (getf args :send-input-function) (getf args :send-input-function #'comint-send-input))
+
+ `(quick-repl-history-search-add-repl ,major-mode
+    (quick-repl-history-search--get-history-from-ring comint-input-ring)
+    ,@args))
+
+;;;=================================================================================================
+
 (eval-after-load "eshell"
  `(quick-repl-history-search-add-repl eshell-mode
     (quick-repl-history-search--get-history-from-ring eshell-history-ring)))
@@ -327,8 +350,16 @@
     :send-input-function ielm-send-input
     :mode-map ielm-map))
 
+(eval-after-load "nrepl"
+ `(quick-repl-history-search-add-repl nrepl-mode
+    nrepl-input-history))
+
 (eval-after-load "skewer-repl"
  `(quick-repl-history-search-add-comint-repl skewer-repl-mode))
+
+(eval-after-load "slime-repl"
+ `(quick-repl-history-search-add-repl slime-repl-mode
+    slime-repl-input-history :send-input-function slime-repl-return))
 
 ;;;=================================================================================================
 
