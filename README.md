@@ -21,6 +21,8 @@
 
 ## Supported REPLs
 
+* Comint
+* Coffee
 * Eshell
 * IELM
 * nREPL

@@ -15,6 +15,8 @@
 ;;;; 1.2 Added IELM support
 ;;;; 1.3 Added Skewer support
 ;;;; 1.4 Added nREPL support
+;;;; 1.5 Added Comint major-mode support
+;;;;     Tested Coffee-repl
 
 (require 'cl)
 
@@ -23,7 +25,7 @@
 (defgroup quick-repl-history-search nil
   "Quick history search for any Emacs REPL"
   :group 'emacs
-  :version "1.4"
+  :version "1.5"
   :link '(emacs-library-link :tag "Lisp File" "quick-repl-history-search.el"))
 
 (defcustom quick-repl-history-search-mode-map
@@ -152,6 +154,7 @@
         (setf query (regexp-quote query)))
       (loop
        (unless ,pop-list
+         ;; don't use `error' because of behavior of after-change-functions
          (message "No matches")
          (return))
        (when quick-repl-history-search--current-history-item
@@ -171,7 +174,7 @@
 (make-variable-buffer-local 'quick-repl-history-search--kill-ring-backup)
 
 (defun quick-repl-history-search--initialize (&optional regexp-search-p)
-  "Initializes quick-repl-history-search buffer and  buffer-local variables"
+  "Initializes quick-repl-history-search buffer and buffer-local variables"
   (end-of-buffer)
   (let ((kill-ring-copy (copy-list kill-ring)) ;; FIXME
         (target (cons (selected-window) (current-buffer)))
@@ -271,13 +274,11 @@
 
 (add-hook 'after-change-functions 'quick-repl-history-search--update)
 
-;;;=================================================================================================
-
 (defun quick-repl-history-search-start/stop-after-change-update ()
   (interactive)
   (if quick-repl-history-search--after-change-update-p
-      (message "Stoping after change update")
-      (message "Starting after change update"))
+      (message "Stoping after-change update")
+      (message "Starting after-change update"))
   (setq quick-repl-history-search--after-change-update-p (not quick-repl-history-search--after-change-update-p)))
 
 ;;;=================================================================================================
@@ -340,25 +341,28 @@
 
 ;;;=================================================================================================
 
+(eval-after-load "comint"
+ '(quick-repl-history-search-add-comint-repl comint-mode))
+
 (eval-after-load "eshell"
- `(quick-repl-history-search-add-repl eshell-mode
+ '(quick-repl-history-search-add-repl eshell-mode
     (quick-repl-history-search--get-history-from-ring eshell-history-ring)))
 
 (eval-after-load "ielm"
- `(quick-repl-history-search-add-comint-repl inferior-emacs-lisp-mode
+ '(quick-repl-history-search-add-comint-repl inferior-emacs-lisp-mode
     :prefix "ielm"
     :send-input-function ielm-send-input
     :mode-map ielm-map))
 
 (eval-after-load "nrepl"
- `(quick-repl-history-search-add-repl nrepl-mode
+ '(quick-repl-history-search-add-repl nrepl-mode
     nrepl-input-history))
 
 (eval-after-load "skewer-repl"
- `(quick-repl-history-search-add-comint-repl skewer-repl-mode))
+ '(quick-repl-history-search-add-comint-repl skewer-repl-mode))
 
 (eval-after-load "slime-repl"
- `(quick-repl-history-search-add-repl slime-repl-mode
+ '(quick-repl-history-search-add-repl slime-repl-mode
     slime-repl-input-history :send-input-function slime-repl-return))
 
 ;;;=================================================================================================
