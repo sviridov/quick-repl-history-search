@@ -1,4 +1,4 @@
-Change prompt buffer to minibuffer
+Fix: possible kill-ring issues
 
 Change history search algorithm
 

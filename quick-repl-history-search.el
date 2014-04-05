@@ -1,11 +1,11 @@
-;;;; quick-repl-history-search.el
+;;;; quick-repl-history-search --- Quick history search for any Emacs REPL
 ;;;;
 ;;;; quick-repl-history-search is available under the MIT license;
 ;;;; see LICENSE for details
 ;;;;
 ;;;; For a detailed introduction see: README.md
 ;;;;
-;;;; Copyright (C) 2013 Sviridov Alexander <sviridov.vmi@gmail.com>
+;;;; Copyright (C) 2013-2014 Sviridov Alexander <sviridov.vmi@gmail.com>
 ;;;;
 ;;;; Change Log:
 ;;;;
@@ -21,6 +21,7 @@
 (require 'cl)
 
 ;;;=================================================================================================
+;;; Code:
 
 (defgroup quick-repl-history-search nil
   "Quick history search for any Emacs REPL"
@@ -50,16 +51,11 @@
 
 ;;;=================================================================================================
 
-(defvar quick-repl-history-search-mode nil
-  "Minor mode for quick-repl-history-search prompt buffer")
-
-(make-variable-buffer-local 'quick-repl-history-search-mode)
-
-(add-to-list 'minor-mode-alist '(quick-repl-history-search-mode " QuickSearch"))
-(add-to-list 'minor-mode-map-alist `(quick-repl-history-search-mode . ,quick-repl-history-search-mode-map))
-
-(defvar quick-repl-history-search--mode-line-format
-  '(" *quick-repl-history-search*")) ;; TODO: Add more information
+(define-minor-mode quick-repl-history-search-mode
+  "Toggle the internal mode used by `quick-repl-history-search'."
+  nil
+  " *quick-repl-history-search*" ;; TODO: Add more information
+  quick-repl-history-search-mode-map)
 
 ;;;=================================================================================================
 
@@ -175,7 +171,7 @@
 
 (defun quick-repl-history-search--initialize (&optional regexp-search-p)
   "Initializes quick-repl-history-search buffer and buffer-local variables"
-  (end-of-buffer)
+  (goto-char (point-max))
   (let ((kill-ring-copy (copy-list kill-ring)) ;; FIXME
         (target (cons (selected-window) (current-buffer)))
         ;; if REPL has input, kill it
@@ -184,32 +180,33 @@
                            (quick-repl-history-search--kill-input)
                            (point)))))
 
-    ;; quick-repl-history-search buffer initialization
-    (select-window (split-window-vertically -4))
-    (switch-to-buffer (generate-new-buffer "*quick-repl-history-search*"))
+    ;; quick-repl-history-search minibuffer initialization
+    (minibuffer-with-setup-hook
+        (lambda ()
+          (quick-repl-history-search-mode 1)
+          ;; quick-repl-history-search buffer-local variables initialization
+          (setq quick-repl-history-search--target target
+                quick-repl-history-search--history (quick-repl-history-search--with-target-buffer
+                                                    (quick-repl-history-search--get-history))
+                quick-repl-history-search--history-reversed nil
+                quick-repl-history-search--current-history-item nil
+                quick-repl-history-search--kill-ring-backup kill-ring-copy
+                quick-repl-history-search--regexp-search-p regexp-search-p)
 
-    ;; quick-repl-history-search buffer-local variables initialization
-    (setf quick-repl-history-search--target target
-          quick-repl-history-search-mode t
-          quick-repl-history-search--history (quick-repl-history-search--with-target-buffer
-                                              (quick-repl-history-search--get-history))
-          quick-repl-history-search--history-reversed nil
-          quick-repl-history-search--current-history-item nil
-          quick-repl-history-search--kill-ring-backup kill-ring-copy
-          quick-repl-history-search--regexp-search-p regexp-search-p
-          mode-line-format quick-repl-history-search--mode-line-format)
+          (add-hook 'post-command-hook 'quick-repl-history-search--update nil t)
 
-    ;; if REPL has input, yank it into quick-repl-history-search buffer
-    (when has-input-p
-      (yank))))
+          ;; if REPL has input, yank it into quick-repl-history-search minibuffer
+          (when has-input-p
+            (yank)))
+
+      (read-from-minibuffer "Search: "))))
 
 (defun quick-repl-history-search--clean ()
   "Finalize quick-repl-history-search buffer"
-  (setf kill-ring quick-repl-history-search--kill-ring-backup) ;; FIXME
-  (let ((window (car quick-repl-history-search--target)))
-    (kill-buffer (current-buffer))
-    (delete-window (selected-window))
-    (select-window window)))
+  (quick-repl-history-search-mode -1)
+  (remove-hook 'post-command-hook 'quick-repl-history-search--update t)
+  (setq kill-ring quick-repl-history-search--kill-ring-backup) ;; FIXME
+  (abort-recursive-edit))
 
 ;;;=================================================================================================
 
@@ -225,7 +222,7 @@
 
 (defun quick-repl-history-search-next ()
   (interactive)
-  (let ((result (quick-repl-history-search--find-next (buffer-string))))
+  (let ((result (quick-repl-history-search--find-next (minibuffer-contents))))
     (when result
       (quick-repl-history-search--with-target-buffer
        (quick-repl-history-search--kill-input)
@@ -233,7 +230,7 @@
 
 (defun quick-repl-history-search-previous ()
   (interactive)
-  (let ((result (quick-repl-history-search--find-prev (buffer-string))))
+  (let ((result (quick-repl-history-search--find-prev (minibuffer-contents))))
     (when result
       (quick-repl-history-search--with-target-buffer
        (quick-repl-history-search--kill-input)
@@ -245,12 +242,13 @@
 
 (defun quick-repl-history-search-complete-and-send ()
   (interactive)
-  (quick-repl-history-search-complete)
-  (quick-repl-history-search--send-input))
+  (quick-repl-history-search--with-target-buffer
+   (quick-repl-history-search--send-input))
+  (quick-repl-history-search-complete))
 
 (defun quick-repl-history-search-abort ()
   (interactive)
-  (let ((query (buffer-string)))
+  (let ((query (minibuffer-contents)))
     (quick-repl-history-search--with-target-buffer
      (quick-repl-history-search--kill-input)
      (insert query))
@@ -266,13 +264,12 @@
 (defun quick-repl-history-search--update (&rest _)
   (when (and quick-repl-history-search-mode
              quick-repl-history-search--after-change-update-p)
-    (unless (and quick-repl-history-search--current-history-item
-                 (string-match-p (buffer-string) quick-repl-history-search--current-history-item))
+    (unless (or (string= "" (minibuffer-contents))
+                (and quick-repl-history-search--current-history-item
+                     (string-match-p (minibuffer-contents) quick-repl-history-search--current-history-item)))
       (if quick-repl-history-search--search-direction-is-next-p
           (quick-repl-history-search-next)
           (quick-repl-history-search-previous)))))
-
-(add-hook 'after-change-functions 'quick-repl-history-search--update)
 
 (defun quick-repl-history-search-start/stop-after-change-update ()
   (interactive)
@@ -370,3 +367,4 @@
 (provide 'quick-repl-history-search)
 
 ;;;=================================================================================================
+;;; quick-repl-history-search.el ends here
